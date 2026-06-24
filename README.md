@@ -76,11 +76,13 @@ Navigate to **AWS Console → S3 → Create bucket**.
 
 After creation, upload your source file:
 - Click **Upload** inside the bucket
-- Upload `sample_50MB.txt` (50 MB text file)
+- Upload `sample_50MB.txt` (50 MB text file) — included in this repo under `sample-data/`
 
-> Screenshot: S3 bucket `compression-file` created with `sample_50MB.txt` uploaded (50.0 MB)
+> **Note:** The file contains 888,624 lines of repeated text, making it ideal for testing ZIP DEFLATE compression (achieves 99.7% reduction).
 
-![S3 Bucket](./Screenshots/s3-bucket.png)
+> Screenshot: S3 bucket `compression-file` with `sample_50MB.txt` uploaded (50.0 MB)
+
+![S3 File Upload](./Screenshots/s3-file-upload.jpeg)
 
 ---
 
@@ -97,6 +99,10 @@ Navigate to **AWS Console → IAM → Roles → Create role**.
 - Skip attaching managed policies for now (we'll create a custom inline policy)
 - Click Next
 
+> Screenshot: IAM Add permissions screen
+
+![IAM Add Permissions](./Screenshots/iam-add-permissions.jpeg)
+
 **Step 2c — Name the role:**
 - **Role name:** `LambdaS3CompressionRole`
 - **Description:** `Allows Lambda functions to call AWS services on your behalf.`
@@ -104,7 +110,7 @@ Navigate to **AWS Console → IAM → Roles → Create role**.
 
 > Screenshot: IAM role `LambdaS3CompressionRole` creation — Name, review, and create screen
 
-![IAM Role Creation](./Screenshots/iam-role-create.png)
+![IAM Role Creation](./Screenshots/iam-role-create.jpeg)
 
 ---
 
@@ -116,23 +122,27 @@ After creating the role, open `LambdaS3CompressionRole` → **Permissions tab** 
 
 ```json
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:HeadObject"
-      ],
-      "Resource": "arn:aws:s3:::compression-file/*"
-    }
-  ]
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Effect": "Allow",
+			"Action": [
+				"s3:GetObject",
+				"s3:PutObject",
+				"s3:HeadObject"
+			],
+			"Resource": "arn:aws:s3:::compression-file/*"
+		}
+	]
 }
 ```
 
 - **Policy name:** `Compression`
 - Click **Create policy**
+
+> Screenshot: Create inline policy with name `Compression`
+
+![IAM Policy Create](./Screenshots/iam-policy-create.jpeg)
 
 > Why these 3 actions?
 > - `s3:GetObject` — download the source file
@@ -141,7 +151,7 @@ After creating the role, open `LambdaS3CompressionRole` → **Permissions tab** 
 
 > Screenshot: IAM policy `Compression` attached to `LambdaS3CompressionRole`
 
-![IAM Policy](./Screenshots/iam-policy.png)
+![IAM Policy](./Screenshots/iam-role-summary.jpeg)
 
 ---
 
@@ -158,7 +168,7 @@ Navigate to **AWS Console → Lambda → Functions → Create function**.
 
 > Screenshot: Create function screen with `FileCompressor` name entered
 
-![Lambda Create](./Screenshots/lambda-create.png)
+![Lambda Create](./Screenshots/lambda-create.jpeg)
 
 ---
 
@@ -183,17 +193,14 @@ def lambda_handler(event, context):
     with tempfile.TemporaryDirectory() as tmp:
         download_path = os.path.join(tmp, 'input_file')
         zip_path = os.path.join(tmp, 'output_file.zip')
-        
-        # Download source file from S3
+
         s3.download_file(SOURCE_BUCKET, SOURCE_KEY, download_path)
-        
-        # Compress using ZIP DEFLATE
+
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
             zf.write(download_path, SOURCE_KEY)
-        
-        # Upload compressed file back to S3
+
         s3.upload_file(zip_path, DEST_BUCKET, DEST_KEY)
-    
+
     return {
         'statusCode': 200,
         'body': 'File compressed and uploaded successfully!'
@@ -209,7 +216,7 @@ Click **Deploy** (or Ctrl+Shift+U).
 
 > Screenshot: Lambda code deployed successfully
 
-![Lambda Code](./Screenshots/lambda-code.png)
+![Lambda Code](./Screenshots/lambda-code.jpeg)
 
 ---
 
@@ -238,7 +245,7 @@ Click **Test** and check the output panel at the bottom.
 
 > Screenshot: Lambda test showing `Status: Succeeded`
 
-![Lambda Test Success](./Screenshots/lambda-test-success.png)
+![Lambda Test Success](./Screenshots/lambda-test-success.jpeg)
 
 ---
 
@@ -255,7 +262,7 @@ You should now see two files:
 
 > Screenshot: S3 bucket showing both source and compressed files
 
-![S3 Output](./Screenshots/s3-output.png)
+![S3 Output](./Screenshots/s3-output.jpeg)
 
 ---
 
@@ -278,7 +285,7 @@ Click **Create rule**.
 
 > Screenshot: EventBridge rule `S3UploadTriggerRule` enabled with 15-minute fixed rate
 
-![EventBridge Rule](./Screenshots/eventbridge-rule.png)
+![EventBridge Rule](./Screenshots/eventbridge-rule.jpeg)
 
 ---
 
@@ -323,16 +330,18 @@ Through this project I learned:
 
 ## Screenshots
 
-| Screenshot | Description |
+| Screenshot Filename | Description |
 |---|---|
-| `s3-bucket.png` | S3 bucket created with source file uploaded |
-| `iam-role-create.png` | IAM role `LambdaS3CompressionRole` creation screen |
-| `iam-policy.png` | `Compression` inline policy attached to role |
-| `lambda-create.png` | Lambda function creation screen |
-| `lambda-code.png` | Lambda code deployed in editor |
-| `lambda-test-success.png` | Test execution showing Status: Succeeded |
-| `s3-output.png` | S3 bucket showing compressed output file |
-| `eventbridge-rule.png` | EventBridge scheduled rule details |
+| `s3-file-upload.png` | S3 bucket `compression-file` with `sample_50MB.txt` (50.0 MB) uploaded |
+| `iam-add-permissions.png` | IAM Create role — Add permissions screen (Step 2) |
+| `iam-policy-create.png` | Create inline policy — Review and create with policy name `Compression` |
+| `iam-role-create.png` | IAM role name `LambdaS3CompressionRole` — Name, review and create screen |
+| `iam-role-summary.png` | `LambdaS3CompressionRole` summary showing `Compression` policy attached |
+| `lambda-code.png` | Lambda code editor showing deployed `lambda_function.py` |
+| `lambda-create.png` | Lambda Create function screen with `FileCompressor` name entered |
+| `lambda-test-success.png` | Lambda test output panel showing `Status: Succeeded` |
+| `s3-output.png` | S3 bucket showing both `sample_50MB.txt` (50 MB) and `sample_50MB.zip` (149.2 KB) |
+| `eventbridge-rule.png` | EventBridge `S3UploadTriggerRule` details — Enabled, Fixed rate 15 minutes |
 
 ---
 
@@ -342,20 +351,25 @@ Through this project I learned:
 AWS-Lambda-S3-File-Compression/
 │
 ├── lambda/
-│   └── lambda_function.py       # Lambda compression code
+│   └── lambda_function.py          # Lambda compression code
 │
 ├── iam/
-│   └── compression-policy.json  # IAM inline policy JSON
+│   └── compression-policy.json     # IAM inline policy JSON
+│
+├── sample-data/
+│   └── sample_50MB.txt             # 50 MB test file (888,624 lines) — upload this to S3
 │
 ├── Screenshots/
-│   ├── s3-bucket.png
-│   ├── iam-role-create.png
-│   ├── iam-policy.png
-│   ├── lambda-create.png
-│   ├── lambda-code.png
-│   ├── lambda-test-success.png
-│   ├── s3-output.png
-│   └── eventbridge-rule.png
+│   ├── eventbridge-rule.png        # EventBridge scheduled rule details
+│   ├── iam-add-permissions.png     # IAM add permissions screen
+│   ├── iam-policy-create.png       # Compression inline policy creation
+│   ├── iam-role-create.png         # IAM role name & review screen
+│   ├── iam-role-summary.png        # Role with policy attached
+│   ├── lambda-code.png             # Lambda code in editor
+│   ├── lambda-create.png           # Lambda create function screen
+│   ├── lambda-test-success.png     # Test result: Status Succeeded
+│   ├── s3-file-upload.png          # sample_50MB.txt uploaded to bucket
+│   └── s3-output.png               # S3 bucket with both .txt and .zip files
 │
 └── README.md
 ```
